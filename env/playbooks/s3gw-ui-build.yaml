@@ -1,0 +1,33 @@
+- name: s3gw-ui build image
+  hosts: kubectl
+  become: true
+  tasks:
+
+    - name: mkdir s3gw-ui
+      command: mkdir -p /home/{{ user }}/s3gw-ui/s3gw-ui
+
+    - name: Copy Dockerfile.s3gw-ui to local directory
+      copy: src=../../build-ui/Dockerfile.s3gw-ui dest=/home/{{ user }}/s3gw-ui mode=0777
+
+    - name: Git s3gw-ui checkout
+      git:
+        repo: "{{ ui_repo }}"
+        dest: /home/{{ user }}/s3gw-ui/s3gw-ui
+        version: "{{ ui_repo_branch }}"
+
+    - name: Build s3gw-ui image
+      community.docker.docker_image:
+       build:
+          path: /home/{{ user }}/s3gw-ui/s3gw-ui
+          dockerfile: /home/{{ user }}/s3gw-ui/Dockerfile.s3gw-ui
+       name: "{{ imageName_ui }}"
+       tag: "{{ imageTag_ui }}"
+       source: build
+
+    - name: Tag and push s3gw-ui to local registry
+      community.docker.docker_image:
+        name: s3gw-ui
+        repository: "{{ imageRegistry_push_ui }}/{{ imageName_ui }}"
+        tag: "{{ imageTag_ui }}"
+        push: yes
+        source: local

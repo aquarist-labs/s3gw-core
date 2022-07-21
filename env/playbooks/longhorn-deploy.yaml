@@ -7,3 +7,23 @@
 
     - name: Deploy Longhorn
       command: kubectl apply -f https://raw.githubusercontent.com/longhorn/longhorn/v1.2.4/deploy/longhorn.yaml
+
+    - name: Wait ingress controller to become ready, this could take a while ...
+      command: kubectl wait --namespace kube-system --for=condition=ready pod --selector=app.kubernetes.io/name=traefik --timeout=30s
+      register: result
+      until: result.rc == 0
+      retries: 20
+      delay: 5
+
+    - name: Copy ingress cfg to local dir
+      copy: src=../ingress dest=/home/{{ user }} mode=0777
+
+    - name: Apply traefik-nodeport.yaml
+      kubernetes.core.k8s:
+        state: present
+        src: /home/{{ user }}/ingress/traefik-nodeport.yaml
+
+    - name: Apply longhorn-ingress.yaml
+      kubernetes.core.k8s:
+        state: present
+        src: /home/{{ user }}/ingress/longhorn-ingress.yaml

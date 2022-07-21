@@ -1,0 +1,47 @@
+- name: s3gw deploy
+  hosts: kubectl
+  tasks:
+
+    - name: Copy s3gw-charts to local directory
+      copy: src=s3gw-charts dest=/home/{{ user }} mode=0777
+
+    - name: Run Helm add Traefik repo
+      shell: helm repo add traefik https://helm.traefik.io/traefik
+      register: out
+      args:
+        chdir: /home/{{ user }}/s3gw-charts/charts/s3gw/
+    - debug: var=out.stdout_lines
+
+    - name: Run Helm dependency
+      shell: helm dependency build
+      register: out
+      args:
+        chdir: /home/{{ user }}/s3gw-charts/charts/s3gw/
+    - debug: var=out.stdout_lines
+
+    - name: Deploy latest version of s3gw chart inside s3gw-system namespace with values
+      kubernetes.core.helm:
+        name: s3gw
+        chart_ref: /home/{{ user }}/s3gw-charts/charts/s3gw
+        release_namespace: s3gw-system
+        create_namespace: true
+        values_files:
+          - /home/{{ user }}/s3gw-charts/charts/s3gw/values.yaml
+        values:
+          imageRegistry: "{{ imageRegistry }}"
+          imagePullPolicy: "{{ imagePullPolicy }}"
+          imageName: "{{ imageName }}"
+          imageTag: "{{ imageTag }}"
+          imageRegistry_ui: "{{ imageRegistry_pull_ui }}"
+          imagePullPolicy_ui: "{{ imagePullPolicy_ui }}"
+          imageName_ui: "{{ imageName_ui }}"
+          imageTag_ui: "{{ imageTag_ui }}"
+          ui:
+            enabled: true
+
+    - name: Wait s3gw application to become ready, this could take a while ...
+      command: kubectl wait --namespace s3gw-system --for=condition=ready pod --selector=app.aquarist-labs.io/name=s3gw --timeout=30s
+      register: result
+      until: result.rc == 0
+      retries: 20
+      delay: 2

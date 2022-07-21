@@ -1,8 +1,10 @@
+PROV_USER                 = ENV["PROV_USER"] || "vagrant"
 BOX_NAME                  = ENV["BOX_NAME"] || "opensuse/Leap-15.3.x86_64"
 VM_PROVIDER               = ENV["VM_PROVIDER"] || "libvirt"
 VM_NET                    = (ENV["VM_NET"] || "10.46.201.0").split(".0")[0]
 VM_NET_LAST_OCTET_START   = Integer(ENV["VM_NET_LAST_OCTET_START"] || "101")
 VM_BRIDGE_INET            = ENV["VM_BRIDGE_INET"] || "eth0"
+K3S_VERSION               = ENV["K3S_VERSION"] || "v1.23.6+k3s1"
 
 #k3s-ansible seems to work with only 1 admin; this should be investigated.
 #For the time being, we assume this value hardcoded to 1.
@@ -19,15 +21,18 @@ WORKER_DISK               = ((ENV["WORKER_DISK"] || "no") == "yes")
 WORKER_DISK_SIZE          = ENV["WORKER_DISK_SIZE"] || "8G"
 STOP_AFTER_BOOTSTRAP      = ((ENV["STOP_AFTER_BOOTSTRAP"] || "no") == "yes")
 STOP_AFTER_K3S_INSTALL    = ((ENV["STOP_AFTER_K3S_INSTALL"] || "no") == "yes")
-S3GW_IMAGE                = ENV["S3GW_IMAGE"] || "ghcr.io/aquarist-labs/s3gw:latest"
-S3GW_IMAGE_PULL_POLICY    = ENV["S3GW_IMAGE_PULL_POLICY"] || "Always"
-PROV_USER                 = ENV["PROV_USER"] || "vagrant"
-S3GW_UI_IMAGE             = "admin-1.local/s3gw-ui:latest"
-S3GW_UI_IMAGE_PULL_POLICY = "Always"
-S3GW_UI_REPO              = ENV["S3GW_UI_REPO"] || ""
-S3GW_UI_VERSION           = ENV["S3GW_UI_VERSION"] || ""
+IMG_REG                   = ENV["IMG_REG"] || "ghcr.io/aquarist-labs"
+IMG_NAME                  = ENV["IMG_NAME"] || "s3gw"
+IMG_TAG                   = ENV["IMG_TAG"] || "latest"
+IMG_PULL_POLICY           = ENV["IMG_PULL_POLICY"] || "Always"
+UI_IMG_REG_PUSH           = ENV["UI_IMG_REG_PUSH"] || "admin-1:5000"
+UI_IMG_REG_PULL           = ENV["UI_IMG_REG_PULL"] || "admin-1.local"
+UI_IMG_NAME               = ENV["UI_IMG_NAME"] || "s3gw-ui"
+UI_IMG_TAG                = ENV["UI_IMG_TAG"] || "latest"
+UI_IMG_PULL_POLICY        = ENV["UI_IMG_PULL_POLICY"] || "Always"
+UI_REPO                   = ENV["UI_REPO"] || ""
+UI_REPO_BRANCH            = ENV["UI_REPO_BRANCH"] || ""
 SCENARIO                  = ENV["SCENARIO"] || ""
-K3S_VERSION               = ENV["K3S_VERSION"] || "v1.23.6+k3s1"
 
 ansible_groups = {
   "apt" => [],
@@ -50,12 +55,17 @@ ansible_groups = {
 extra_vars = {
 	user: PROV_USER,
 	worker_count: WORKER_COUNT,
-	s3gw_image: S3GW_IMAGE,
-	s3gw_image_pull_policy: S3GW_IMAGE_PULL_POLICY,
-  s3gw_ui_image: S3GW_UI_IMAGE,
-	s3gw_ui_image_pull_policy: S3GW_UI_IMAGE_PULL_POLICY,
-  s3gw_ui_repo: S3GW_UI_REPO,
-  s3gw_ui_version: S3GW_UI_VERSION,
+	imageRegistry: IMG_REG,
+	imageName: IMG_NAME,
+	imageTag: IMG_TAG,
+	imagePullPolicy: IMG_PULL_POLICY,
+  imageRegistry_push_ui: UI_IMG_REG_PUSH,
+  imageRegistry_pull_ui: UI_IMG_REG_PULL,
+  imageName_ui: UI_IMG_NAME,
+  imageTag_ui: UI_IMG_TAG,
+	imagePullPolicy_ui: UI_IMG_PULL_POLICY,
+  ui_repo: UI_REPO,
+  ui_repo_branch: UI_REPO_BRANCH,
   scenario: SCENARIO,
   k3s_version: K3S_VERSION,
   systemd_dir: "/etc/systemd/system",
@@ -95,21 +105,17 @@ def ansible_provision (context, ansible_groups, extra_vars)
         ansible.groups = ansible_groups
         ansible.extra_vars = extra_vars
       end
-      context.vm.provision "ansible" do |ansible|
-        ansible.limit = "all"
-        ansible.playbook = "playbooks/s3gw-deploy.yaml"
-        ansible.groups = ansible_groups
-        ansible.extra_vars = extra_vars
+      if UI_REPO != ""
+        context.vm.provision "ansible" do |ansible|
+          ansible.limit = "all"
+          ansible.playbook = "playbooks/s3gw-ui-build.yaml"
+          ansible.groups = ansible_groups
+          ansible.extra_vars = extra_vars
+        end
       end
       context.vm.provision "ansible" do |ansible|
         ansible.limit = "all"
-        ansible.playbook = "playbooks/s3gw-ui-deploy.yaml"
-        ansible.groups = ansible_groups
-        ansible.extra_vars = extra_vars
-      end
-      context.vm.provision "ansible" do |ansible|
-        ansible.limit = "all"
-        ansible.playbook = "playbooks/ingress-traefik-deploy.yaml"
+        ansible.playbook = "playbooks/s3gw-chart-apply.yaml"
         ansible.groups = ansible_groups
         ansible.extra_vars = extra_vars
       end

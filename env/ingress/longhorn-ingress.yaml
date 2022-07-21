@@ -4,10 +4,6 @@ metadata:
   name: longhorn-ingress
   namespace: longhorn-system
 spec:
-  tls:
-    - hosts:
-        - longhorn.local
-      secretName: longhorn-ingress-secret
   rules:
     - host: longhorn.local
       http:

@@ -36,6 +36,13 @@
             - docker-ce
             - docker-ce-cli
 
+    - name: Install Helm
+      shell: |
+          curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+          sudo apt-get update
+          sudo apt-get install helm
+
 - name: Install Packages - [ZYPPER]
   hosts: zypper
   become: true
@@ -52,6 +59,8 @@
             - git
             - docker
             - python3-docker
+            - helm
+            - helm-bash-completion
 
 - name: Install pip
   hosts: master
@@ -182,4 +191,4 @@
     - name: Add local names to /etc/hosts
       lineinfile:
         path: /etc/hosts
-        line: "127.0.0.1   longhorn.local s3gw.local s3gw-no-tls.local s3gw-ui.local"
+        line: "127.0.0.1   longhorn.local s3gw.local no-tls-s3gw.local ui-s3gw.local no-tls-ui-s3gw.local"
